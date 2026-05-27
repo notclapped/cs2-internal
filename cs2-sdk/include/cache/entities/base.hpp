@@ -1,40 +1,47 @@
 #pragma once
+#include <bindings/baseentity.hpp>
+#include <imgui/imgui.h>
 
-#include <types/handle.hpp>
+struct BBox_t {
+    ImVec2 m_Mins = {0.f, 0.f};
+    ImVec2 m_Maxs = {0.f, 0.f};
+    ImVec2 m_Vertices[8] = {};
+    bool m_Valid = false;
 
-#include <math/types/bbox.hpp>
+    void Invalidate() { m_Valid = false; }
+};
 
 class CCachedBaseEntity {
    public:
-    enum class Type { GENERIC = 0, PLAYER, GUN, HEN, HOSTAGE };
+    enum class Type : int { UNKNOWN = 0, PLAYER, GUN, CAPTIVE, HEN, HOSTAGE };
 
-    CCachedBaseEntity() {}
-    CCachedBaseEntity(const CCachedBaseEntity&) = delete;
-    CCachedBaseEntity& operator=(const CCachedBaseEntity&) = delete;
+    CCachedBaseEntity() = default;
 
-    // Gets rid of the need to dynamic_cast.
-    virtual Type GetType() const { return Type::GENERIC; }
+    CCachedBaseEntity(C_BaseEntity* ent, int index) : m_pEntity(ent), m_iIndex(index) {}
+    virtual ~CCachedBaseEntity() = default;
 
     template <typename T = C_BaseEntity>
-    auto Get() const {
-        return CHandle<T>(m_Handle).Get();
+    T* Get() const {
+        return reinterpret_cast<T*>(m_pEntity);
     }
 
-    auto GetHandle() const { return m_Handle; }
-    auto SetHandle(CBaseHandle handle) { m_Handle = handle; }
+    int GetIndex() const { return m_iIndex; }
+    void SetHandle(CBaseHandle handle) { m_hHandle = handle; }
+    CBaseHandle GetHandle() const { return m_hHandle; }
 
-    auto GetIndex() const { return m_Handle.GetEntryIndex(); }
-    auto GetSerial() const { return m_Handle.GetSerialNumber(); }
-
-    // Used by ESP.
+    virtual Type GetType() const { return Type::UNKNOWN; }
     virtual bool CanDoESP();
     virtual void DrawESP();
-    virtual void InvalidateDrawInfo();
     virtual void CalculateDrawInfo();
+    virtual void InvalidateDrawInfo();
+    virtual void DrawBoundingBox(ImU32 color);
 
-   protected:
-    void DrawBoundingBox(ImU32 color);
-
-    CBaseHandle m_Handle;
+   public:
     BBox_t m_BBox;
+    BBox_t m_RenderBBox;  // Dedicated buffer to survive multiple engine passes
+
+   private:
+    C_BaseEntity* m_pEntity = nullptr;
+    int m_iIndex = -1;
+    CBaseHandle m_hHandle{};
 };

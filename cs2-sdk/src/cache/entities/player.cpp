@@ -1,17 +1,12 @@
 #include "pch.hpp"
-
 #include <cache/entities/player.hpp>
 #include <cache/cache.hpp>
-
 #include <renderer/renderer.hpp>
 #include <vars/vars.hpp>
-
 #include <bindings/playercontroller.hpp>
 #include <bindings/playerpawn.hpp>
-
 #include <interfaces/engineclient.hpp>
 #include <interfaces/cvar.hpp>
-
 #include <imgui/imgui_internal.h>
 #include <math/math.hpp>
 
@@ -30,15 +25,15 @@ bool CCachedPlayer::CanDoESP() {
 }
 
 void CCachedPlayer::DrawESP() {
+    if (!m_RenderBBox.m_Valid) return;
+
     CCachedPlayer* cachedLocalPlayer = CMatchCache::Get().GetLocalPlayer();
-    if (!cachedLocalPlayer) {
-        return InvalidateDrawInfo();
-    }
+    if (!cachedLocalPlayer) return;
 
     auto drawList = CRenderer::GetBackgroundDrawList();
 
-    const ImVec2& min = m_BBox.m_Mins;
-    const ImVec2& max = m_BBox.m_Maxs;
+    const ImVec2& min = m_RenderBBox.m_Mins;
+    const ImVec2& max = m_RenderBBox.m_Maxs;
 
     CCSPlayerController* controller = Get();
     C_CSPlayerPawnBase* pawn = controller->m_hPawn().Get();
@@ -89,10 +84,10 @@ void CCachedPlayer::DrawESP() {
 void CCachedPlayer::CalculateDrawInfo() {
     CCSPlayerController* controller = Get();
     C_CSPlayerPawnBase* pawn = controller->m_hPawn().Get();
-    if (!pawn) return InvalidateDrawInfo();
+    if (!pawn) return;
 
     CGameSceneNode* sceneNode = pawn->m_pGameSceneNode();
-    if (!sceneNode) return InvalidateDrawInfo();
+    if (!sceneNode) return;
 
     Vector origin = sceneNode->m_vecAbsOrigin();
     Vector head = origin;
@@ -101,7 +96,7 @@ void CCachedPlayer::CalculateDrawInfo() {
 
     ImVec2 screenBottom, screenTop;
     if (!CMath::Get().WorldToScreen(origin, screenBottom) || !CMath::Get().WorldToScreen(head, screenTop)) {
-        return InvalidateDrawInfo();
+        return;  // Retain previous valid frame buffer position if calculation pass fails out of bounds
     }
 
     float boxHeight = screenBottom.y - screenTop.y;
@@ -109,6 +104,9 @@ void CCachedPlayer::CalculateDrawInfo() {
 
     m_BBox.m_Mins = ImVec2(screenBottom.x - (boxWidth * 0.5f), screenTop.y);
     m_BBox.m_Maxs = ImVec2(screenBottom.x + (boxWidth * 0.5f), screenBottom.y);
+    m_BBox.m_Valid = true;
+
+    m_RenderBBox = m_BBox;  // Copy immediately upon a verified layout match
 }
 
 CCachedPlayer::Team CCachedPlayer::GetTeam() {
